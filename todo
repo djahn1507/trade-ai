@@ -1,0 +1,23 @@
+❓Sollen wir gleich auch eine rudimentäre „Portfolio-Simulation“ einbauen?
+(z. B. 10.000 € Startkapital, je Signal wird gekauft/verkauft, inkl. Performance-Graph)
+
+Oder möchtest du zuerst den logischen Teil (Accuracy, Winrate) abschließen?
+
+Logging-System (z. B. Accuracy pro Lauf gespeichert in JSON)?
+
+
+
+
+
+dynamisch
+
+| Komponente                | Dynamisch per Parameter         | Beispiel                          |
+| ------------------------- | ------------------------------- | --------------------------------- |
+| 📅 Zeitfenster            | `train_start`, `test_start`     | `"2015-01-01"` bis `"2024-12-31"` |
+| 📈 Aktien/ETF-Auswahl     | `ticker`                        | `"AAPL"`, `"SPY"`, `"TSLA"`       |
+| 🔁 Sequenzlänge (LSTM)    | `sequence_length`               | `30`, `60`, `90` Tage             |
+| 🧠 Modell-Typ             | `model_type = "lstm"`           | später auch `"transformer"`       |
+| 🎯 Klassifikation / Regr. | `target_type = "class"`         | `"class"` oder `"regression"`     |
+| 📊 Backtest-Schwelle      | `buy_threshold = 0.6`           | Trade ab Prediction > 0.6         |
+| 💾 Modellpfad             | `model_path = "models/lstm.h5"` | individuell pro Training          |
+| 💡 Metrik-Auswahl         | `metrics = ["accuracy", "f1"]`  | später für Dashboard / Logging    |

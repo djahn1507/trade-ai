@@ -1,0 +1,22 @@
+{
+  "Ticker": "AAPL",
+  "Zeit": "2025-05-11_20-53-34",
+  "Backtest-Ergebnisse": {
+    "Metriken": {
+      "Genauigkeit": 0.4447,
+      "Präzision": 0.0,
+      "Sensitivität (Recall)": 0.0,
+      "F1-Wert": 0.0,
+      "Kauf-Signale": 0,
+      "Korrekte Käufe": 0,
+      "Trefferquote": 0.0
+    },
+    "Portfolio": {
+      "Startkapital": 10000,
+      "Endkapital": 10000.0,
+      "Rendite (%)": 0.0,
+      "Max Equity": 10000.0,
+      "Min Equity": 10000.0
+    }
+  }
+}
