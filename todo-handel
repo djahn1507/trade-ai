@@ -1,0 +1,31 @@
+## Handelsstrategien & Portfolio-Management
+
+### 1. Verbesserte Handelssignale
+- **Dynamische Schwellenwerte**: Statt fester 0.6-Schwelle adaptive Schwellen basierend auf Marktbedingungen
+- **Konfidenz-basierte Positionsgrößen**: Höhere Modellsicherheit = größere Position
+- **Signalfilterung**: Nur Signale mit bestimmter Mindestdauer verwenden
+- **Trendbestätigung**: Handelssignal mit klassischen Trendfiltern kombinieren
+
+### 2. Risikomanagement
+- **Stop-Loss & Take-Profit**: Automatische Verlustbegrenzung und Gewinnmitnahme
+- **Position Sizing**: Kelly-Kriterium oder Fixed-Fractional-Ansatz für optimale Positionsgrößen
+- **Volatilitätsbasierte Anpassung**: Positionsgrößen nach aktueller Volatilität skalieren
+- **Maximum Drawdown-Kontrolle**: Automatische Reduktion der Position bei bestimmtem Verlust
+
+### 3. Portfolio-Optimierung
+- **Multi-Asset-Allokation**: Diversifikation über mehrere Assets
+- **Korrelationsanalyse**: Handel mit unkorrelierte Assets für bessere Risiko/Rendite
+- **Sektorrotation**: Intelligente Rotation zwischen verschiedenen Marktsektoren
+- **Marktzustandsbasierte Anpassung**: Unterschiedliche Strategien für verschiedene Marktphasen
+
+### 4. Handelssimulation
+- **Realistische Kosten**: Spreads, Slippage und Kommissionen berücksichtigen
+- **Monte-Carlo-Simulation**: Testen der Strategie unter verschiedenen Marktbedingungen
+- **Walk-Forward-Analyse**: Fortlaufende Out-of-Sample Tests
+- **Multi-Timeframe-Bestätigung**: Handel nur bei übereinstimmenden Signalen auf mehreren Zeitebenen
+
+### 5. Performancemetriken
+- **Erweiterte KPIs**: Sharpe-Ratio, Sortino-Ratio, Maximum Drawdown, Win/Loss-Ratio
+- **Risikoanalyse**: Value at Risk (VaR), Conditional VaR
+- **Transaktionseffizienz**: Durchschnittlicher Gewinn pro Trade, Prozent profitabler Trades
+- **Psychologische Faktoren**: Längste Verluststrähne, Zeit unter Höchstwert

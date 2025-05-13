@@ -52,5 +52,7 @@ def train_model():
     # 5. Modell speichern
     os.makedirs("models", exist_ok=True)
     model.save("models/lstm_model.h5")
+    
+
 
     return model, X_test, y_test, test_df

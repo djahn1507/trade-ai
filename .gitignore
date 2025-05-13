@@ -1,3 +1,7 @@
-.venv
+venv-trade
 .vscode
 __pycache__
+.tmp.driveupload
+.tmp.drivedownload
+.h5
+logs
