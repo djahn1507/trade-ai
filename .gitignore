@@ -3,5 +3,6 @@ venv-trade
 __pycache__
 .tmp.driveupload
 .tmp.drivedownload
-.h5
+*.h5
 logs
+*.png

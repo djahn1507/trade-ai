@@ -43,7 +43,13 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
     target_price = 0
     
     for i in range(1, len(predictions) + 1):
-        price_today = float(df['Close'].iloc[i])
+        # Explizit als Fließkommazahl mit sicherer Index-Prüfung extrahieren
+        if i < len(df):
+            # Verwende .iloc[i].squeeze() für Serie und dann float() für sicheren Wert
+            price_today = float(df['Close'].iloc[i].squeeze()) if hasattr(df['Close'].iloc[i], 'squeeze') else float(df['Close'].iloc[i])
+        else:
+            # Fallback zum letzten verfügbaren Preis
+            price_today = float(df['Close'].iloc[-1].squeeze()) if hasattr(df['Close'].iloc[-1], 'squeeze') else float(df['Close'].iloc[-1])
         
         # Explizit einen booleschen Wert erzeugen
         pred_value = float(predictions[i - 1])
