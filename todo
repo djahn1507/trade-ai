@@ -21,3 +21,37 @@ dynamisch
 | 📊 Backtest-Schwelle      | `buy_threshold = 0.6`           | Trade ab Prediction > 0.6         |
 | 💾 Modellpfad             | `model_path = "models/lstm.h5"` | individuell pro Training          |
 | 💡 Metrik-Auswahl         | `metrics = ["accuracy", "f1"]`  | später für Dashboard / Logging    |
+
+Kritisches Problem der negativen Rendite (-24,19%):
+
+Trotz 53,65% Genauigkeit verliert das System Geld. Dies deutet auf eine Asymmetrie hin - falsche Vorhersagen kosten mehr als richtige Vorhersagen einbringen.
+Die Präzision von 50,85% zeigt, dass dein Modell nur geringfügig besser als Zufall ist.
+Der niedrige Recall (13,82%) bedeutet, dass viele profitable Chancen verpasst werden.
+
+
+Sofortige Code-Optimierungen:
+
+Implementiere Stop-Loss und Take-Profit in der kapital_backtest-Funktion
+Ergänze die Auswertung mit Sharpe-Ratio und Maximum Drawdown für bessere Risikobewertung
+Füge weitere technische Indikatoren zur Feature-Liste hinzu (z.B. ADX, ATR für Volatilität)
+
+
+Modellverbesserungen:
+
+Experimentiere mit tieferen LSTM-Netzwerken (mehr Schichten oder Dropout-Rate anpassen)
+Erhöhe die Trainingsepochen (aktuell nur 10) mit Early-Stopping basierend auf Validierungsdaten
+Versuche eine Kombination aus LSTM und Attention-Mechanismen für bessere Mustererkennung
+
+
+Erweiterter Evaluierungsrahmen:
+
+Führe Walk-Forward-Backtests durch (kontinuierliche Neukalibrierung des Modells)
+Vergleiche deine Strategie mit einfachen Benchmarks (Buy & Hold, Moving Average Crossover)
+Analysiere, bei welchen Marktbedingungen dein Modell besonders gut oder schlecht performt
+
+
+Strategische Anpassungen:
+
+Der aktuelle threshold von 0.6 ist möglicherweise zu niedrig - teste höhere Werte (0.7-0.8)
+Implementiere eine Position-Sizing-Logik basierend auf der Vorhersagesicherheit
+Filtere Signale in hochvolatilen Marktphasen oder gegen starke Trends
