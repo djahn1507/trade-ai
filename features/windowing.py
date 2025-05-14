@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 #     return np.array(X), np.array(y)
 
-def create_labels(df: pd.DataFrame, lookahead: int = 5, threshold: float = 0.02) -> pd.Series:
+def create_labels(df: pd.DataFrame, lookahead: int = 3, threshold: float = 0.015) -> pd.Series:
     """
     Ziel ist 1, wenn der Preis in den nächsten `lookahead` Tagen um mindestens `threshold` steigt.
     """

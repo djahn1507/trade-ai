@@ -2,7 +2,6 @@ from backtest.metrics import evaluate_classification
 from backtest.portfolio import kapital_backtest
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import datetime
 
 
@@ -76,60 +75,42 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
             "Gewinn/Verlust-Verhältnis": 0
         }
 
-    # Erstelle einen Equity-Chart und speichere ihn
-    if "Equity-Verlauf" in portfolio:
-        plt.figure(figsize=(12, 6))
-        plt.plot(portfolio["Equity-Verlauf"])
-        plt.title(f"Equity-Verlauf (Rendite: {portfolio['Rendite (%)']}%)")
-        plt.xlabel("Trading Tage")
-        plt.ylabel("Portfolio-Wert")
-        plt.grid(True)
+    # Berechne Buy & Hold Benchmark ohne Grafik zu erstellen
+    benchmark = {"Buy & Hold Rendite (%)": 0, "Überperformance (%)": 0}
 
-        # Buy & Hold Benchmark
-        benchmark = {"Buy & Hold Rendite (%)": 0, "Überperformance (%)": 0}
+    if len(df_test) > 1 and len(portfolio["Equity-Verlauf"]) > 0:
+        try:
+            # Ensure we have valid indices to work with
+            valid_start_index = min(1, len(df_test) - 1)
+            start_price = df_test['Close'].iloc[valid_start_index]
+            end_price = df_test['Close'].iloc[-1]
+            initial_cash = portfolio["Startkapital"]
+            shares = initial_cash / start_price
 
-        if len(df_test) > 1 and len(portfolio["Equity-Verlauf"]) > 0:
-            try:
-                # Ensure we have valid indices to work with
-                valid_start_index = min(1, len(df_test) - 1)
-                start_price = df_test['Close'].iloc[valid_start_index]
-                end_price = df_test['Close'].iloc[-1]
-                initial_cash = portfolio["Startkapital"]
-                shares = initial_cash / start_price
+            # Create buy_hold array with proper length
+            buy_hold = np.full(
+                len(portfolio["Equity-Verlauf"]), initial_cash)
 
-                # Create buy_hold array with proper length
-                buy_hold = np.full(
-                    len(portfolio["Equity-Verlauf"]), initial_cash)
+            # Fill buy_hold array with proper values
+            for i in range(1, len(portfolio["Equity-Verlauf"])):
+                # Ensure index is within bounds
+                idx = min(i + 1, len(df_test) - 1)
+                current_price = df_test['Close'].iloc[idx]
+                buy_hold[i] = shares * current_price
 
-                # Fill buy_hold array with proper values
-                for i in range(1, len(portfolio["Equity-Verlauf"])):
-                    # Ensure index is within bounds
-                    idx = min(i + 1, len(df_test) - 1)
-                    current_price = df_test['Close'].iloc[idx]
-                    buy_hold[i] = shares * current_price
+            # Calculate buy & hold return
+            buy_hold_return = (
+                buy_hold[-1] - buy_hold[0]) / buy_hold[0] * 100
+            benchmark = {
+                "Buy & Hold Rendite (%)": round(buy_hold_return, 2),
+                "Überperformance (%)": round(portfolio["Rendite (%)"] - buy_hold_return, 2)
+            }
+        except (IndexError, ValueError) as e:
+            print(
+                f"Warning: Could not calculate buy & hold benchmark: {e}")
 
-                # Only plot if buy_hold is a valid array
-                if len(buy_hold) > 0:
-                    plt.plot(buy_hold, color='red',
-                             linestyle='--', label='Buy & Hold')
-                    plt.legend()
-
-                # Calculate buy & hold return
-                buy_hold_return = (
-                    buy_hold[-1] - buy_hold[0]) / buy_hold[0] * 100
-                benchmark = {
-                    "Buy & Hold Rendite (%)": round(buy_hold_return, 2),
-                    "Überperformance (%)": round(portfolio["Rendite (%)"] - buy_hold_return, 2)
-                }
-            except (IndexError, ValueError) as e:
-                print(
-                    f"Warning: Could not calculate buy & hold benchmark: {e}")
-
-        chart_filename = f"equity_chart_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-        plt.savefig(chart_filename)
-        plt.close()
-    else:
-        chart_filename = None
+    # Kein Chartname, da wir keine Grafik erstellen
+    chart_filename = None
 
     # Zusammenfassen für Logging
     ergebnisse = {

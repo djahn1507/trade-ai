@@ -22,36 +22,64 @@ dynamisch
 | 💾 Modellpfad             | `model_path = "models/lstm.h5"` | individuell pro Training          |
 | 💡 Metrik-Auswahl         | `metrics = ["accuracy", "f1"]`  | später für Dashboard / Logging    |
 
-Kritisches Problem der negativen Rendite (-24,19%):
+Verbesserungspotenzial - Stichpunkte
 
-Trotz 53,65% Genauigkeit verliert das System Geld. Dies deutet auf eine Asymmetrie hin - falsche Vorhersagen kosten mehr als richtige Vorhersagen einbringen.
-Die Präzision von 50,85% zeigt, dass dein Modell nur geringfügig besser als Zufall ist.
-Der niedrige Recall (13,82%) bedeutet, dass viele profitable Chancen verpasst werden.
+Signalqualität verbessern:
 
-
-Sofortige Code-Optimierungen:
-
-Implementiere Stop-Loss und Take-Profit in der kapital_backtest-Funktion
-Ergänze die Auswertung mit Sharpe-Ratio und Maximum Drawdown für bessere Risikobewertung
-Füge weitere technische Indikatoren zur Feature-Liste hinzu (z.B. ADX, ATR für Volatilität)
+Niedriger Recall-Wert (0.1843) deutet auf viele verpasste profitable Gelegenheiten hin
+Geringe Präzision (0.4444) zeigt, dass weniger als die Hälfte der Kaufsignale gewinnbringend sind
 
 
-Modellverbesserungen:
+Trade-Frequenz optimieren:
 
-Experimentiere mit tieferen LSTM-Netzwerken (mehr Schichten oder Dropout-Rate anpassen)
-Erhöhe die Trainingsepochen (aktuell nur 10) mit Early-Stopping basierend auf Validierungsdaten
-Versuche eine Kombination aus LSTM und Attention-Mechanismen für bessere Mustererkennung
-
-
-Erweiterter Evaluierungsrahmen:
-
-Führe Walk-Forward-Backtests durch (kontinuierliche Neukalibrierung des Modells)
-Vergleiche deine Strategie mit einfachen Benchmarks (Buy & Hold, Moving Average Crossover)
-Analysiere, bei welchen Marktbedingungen dein Modell besonders gut oder schlecht performt
+Nur 90 Kaufsignale generiert, davon 40 ausgeführt - könnte zu wenig sein für optimale Rendite
+Die Strategie nutzt den Markt unzureichend aus (starke Unterperformance vs. Buy & Hold)
 
 
-Strategische Anpassungen:
+Risikomanagement verstärken:
 
-Der aktuelle threshold von 0.6 ist möglicherweise zu niedrig - teste höhere Werte (0.7-0.8)
-Implementiere eine Position-Sizing-Logik basierend auf der Vorhersagesicherheit
-Filtere Signale in hochvolatilen Marktphasen oder gegen starke Trends
+Max Drawdown von 27.41% ist relativ hoch
+Verbesserung des Gewinn/Verlust-Verhältnisses (aktuell nur 1.13)
+
+
+Signalerkennung präzisieren:
+
+Vorhersageverteilung ist zu breit gestreut (0.066 bis 0.809)
+Besser definierte Signalschwellen implementieren
+
+
+Position Sizing anpassen:
+
+Kapitalallokation pro Trade optimieren
+Risikobasiertes Position Sizing einführen
+
+
+Stop-Loss und Take-Profit-Mechanismen:
+
+Automatische Verlustbegrenzung implementieren
+Gewinnmitnahmepunkte definieren
+
+
+Marktphasen-Anpassung:
+
+Filterung nach Marktphasen (Trend, Seitwärts, Volatil)
+Anpassung der Strategie an unterschiedliche Marktbedingungen
+
+
+Zeitrahmen-Optimierung:
+
+Analyse verschiedener Zeiträume (kurzfristig, mittelfristig, langfristig)
+Kombination mehrerer Zeitrahmen für robustere Signale
+
+
+Feature Engineering:
+
+Neue Indikatoren oder Signale einführen
+Bestehende Indikatoren optimieren oder kombinieren
+
+
+Machine Learning verfeinern:
+
+Modellarchitektur überprüfen und anpassen
+Hyperparameter-Optimierung durchführen
+Ensemble-Methoden implementieren
