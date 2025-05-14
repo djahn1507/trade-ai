@@ -1,11 +1,8 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-# In models/lstm.py nach den Imports hinzufügen:
 from tensorflow.keras.layers import Attention, Concatenate, Reshape, Permute, Dense, multiply, Lambda, Flatten
-
-# Neue Modellarchitektur mit Attention-Mechanismus:
-
+from tensorflow.keras import backend as K
 
 def build_lstm_model(
     input_shape: tuple,
@@ -27,15 +24,18 @@ def build_lstm_model(
     lstm2 = LSTM(units//2, return_sequences=True)(lstm1)
     lstm2 = Dropout(dropout_rate/2)(lstm2)
 
-    # Attention-Mechanismus
+    # Attention-Mechanismus mit Keras-kompatiblen Operationen
     attention = Dense(1, activation='tanh')(lstm2)
     attention = Flatten()(attention)
-    attention = tf.keras.activations.softmax(attention)
-    attention = Reshape((attention.shape[1], 1))(attention)
-
-    # Gewichtete Summe
-    merge_model = multiply([lstm2, attention])
-    merge_model = tf.reduce_sum(merge_model, axis=1)
+    attention = Lambda(lambda x: K.softmax(x))(attention)
+    attention = Reshape((1, attention.shape[1]))(attention)
+    
+    # Wenden Sie die Attention auf die LSTM-Ausgabe an (mit Permute)
+    attention = Permute((2, 1))(attention)
+    weighted = multiply([lstm2, attention])
+    
+    # Verwenden Sie Lambda für die Summe
+    merge_model = Lambda(lambda x: K.sum(x, axis=1))(weighted)
 
     # Dense-Layers
     dense1 = Dense(64, activation='relu')(merge_model)
