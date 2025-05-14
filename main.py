@@ -11,7 +11,11 @@ def finde_optimalen_threshold(model, X_test, y_test, test_df, thresholds=None):
     Findet den optimalen Threshold für die besten Backtest-Ergebnisse
     """
     if thresholds is None:
-        thresholds = np.arange(0.35, 0.85, 0.05)  # Erweiterte Suche von 0.35 bis 0.8
+        # Feiner abgestufte Suche im besseren Bereich
+        thresholds = np.concatenate([
+            np.arange(0.35, 0.55, 0.015),  # Feinere Abstufung im vielversprechenden Bereich
+            np.arange(0.55, 0.75, 0.05)    # Gröbere Abstufung darüber
+        ])
 
     results = []
 
@@ -71,10 +75,10 @@ def optimiere_risikomanagement(model, X_test, y_test, test_df, threshold,
     Optimiert die Risikomanagement-Parameter für maximale Rendite
     """
     if stop_losses is None:
-        stop_losses = [0.015, 0.02, 0.025, 0.03, 0.04, 0.05]  # Feiner abgestufte Stop-Loss-Werte
+        stop_losses = [0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04]  # Mehr Fokus auf engere Stops
     
     if take_profits is None:
-        take_profits = [0.03, 0.04, 0.05, 0.06, 0.08, 0.1, 0.15]  # Mehr Optionen für Take-Profit
+        take_profits = [0.02, 0.03, 0.04, 0.05, 0.06, 0.075, 0.09, 0.11]  # Mehr Optionen für Take-Profit
 
     results = []
 
