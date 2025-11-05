@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # def create_lstm_dataset_classification(df: pd.DataFrame, sequence_length: int = 30) -> tuple:
 #     """
