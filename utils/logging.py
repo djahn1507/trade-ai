@@ -1,63 +1,59 @@
+"""Hilfsfunktionen für die JSON-Protokollierung von Backtest-Ergebnissen."""
+
+from __future__ import annotations
+
 import json
 import os
 from datetime import datetime
 
 
-def logge_metriken_json(metriken: dict, ticker: str, speicherpfad="logs/"):
+def logge_metriken_json(metriken: dict, ticker: str, speicherpfad: str = "logs/") -> None:
+    """Speichert reine Metriken im JSON-Format."""
+
     os.makedirs(speicherpfad, exist_ok=True)
     zeitstempel = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     dateiname = f"{ticker}_{zeitstempel}.json"
 
     pfad = os.path.join(speicherpfad, dateiname)
-    with open(pfad, "w") as f:
-        json.dump(metriken, f, indent=2, ensure_ascii=False)
+    with open(pfad, "w", encoding="utf-8") as handle:
+        json.dump(metriken, handle, indent=2, ensure_ascii=False)
 
     print(f"✅ Metriken gespeichert unter: {pfad}")
 
 
-def speichere_logfile(ticker: str, ergebnisse: dict, pfad: str = "logs/"):
-    """
-    Speichert die erweiterten Backtest-Ergebnisse im JSON-Format.
-    
-    Args:
-        ticker: Handelssymbol
-        ergebnisse: Ergebnisdaten aus dem Backtest
-        pfad: Speicherpfad
-    """
+def speichere_logfile(ticker: str, ergebnisse: dict, pfad: str = "logs/") -> None:
+    """Speichert die erweiterten Backtest-Ergebnisse im JSON-Format."""
+
     os.makedirs(pfad, exist_ok=True)
     zeit = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     dateiname = f"{ticker}_{zeit}.json"
     full_path = os.path.join(pfad, dateiname)
-    
-    # Entferne Details, die nicht gut für JSON geeignet sind
+
     ergebnisse_clean = ergebnisse.copy()
     if "Portfolio" in ergebnisse_clean and "Trade-Details" in ergebnisse_clean["Portfolio"]:
         del ergebnisse_clean["Portfolio"]["Trade-Details"]
-    
-    # Entferne Equity-Verlauf (zu groß und unnötig für JSON)
+
     if "Portfolio" in ergebnisse_clean and "Equity-Verlauf" in ergebnisse_clean["Portfolio"]:
         del ergebnisse_clean["Portfolio"]["Equity-Verlauf"]
-    
-    # NumPy-Arrays in Listen umwandeln, da sie nicht JSON-serialisierbar sind
-    def clean_for_json(data):
+
+    def clean_for_json(data):  # type: ignore[override]
         if isinstance(data, dict):
             return {k: clean_for_json(v) for k, v in data.items()}
-        elif hasattr(data, 'tolist'):  # NumPy arrays and similar
+        if hasattr(data, "tolist"):
             return data.tolist()
-        elif isinstance(data, list):
-            return [clean_for_json(i) for i in data]
-        else:
-            return data
-    
+        if isinstance(data, list):
+            return [clean_for_json(item) for item in data]
+        return data
+
     ergebnisse_clean = clean_for_json(ergebnisse_clean)
-    
+
     daten = {
         "Ticker": ticker,
         "Zeit": zeit,
-        "Backtest-Ergebnisse": ergebnisse_clean
+        "Backtest-Ergebnisse": ergebnisse_clean,
     }
 
-    with open(full_path, "w", encoding="utf-8") as f:
-        json.dump(daten, f, indent=2, ensure_ascii=False)
+    with open(full_path, "w", encoding="utf-8") as handle:
+        json.dump(daten, handle, indent=2, ensure_ascii=False)
 
     print(f"✅ Log gespeichert: {full_path}")
