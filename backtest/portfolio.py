@@ -1,70 +1,64 @@
-import numpy as np
-import pandas as pd
+from math import sqrt
+
+def _flatten_to_float_list(values):
+    """Converts nested iterables into a flat list of floats."""
+    if isinstance(values, (list, tuple)):
+        flattened = []
+        for item in values:
+            flattened.extend(_flatten_to_float_list(item))
+        return flattened
+    if hasattr(values, "tolist"):
+        return _flatten_to_float_list(values.tolist())
+    return [float(values)]
 
 
-def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
-                     initial_cash=10_000, stop_loss_pct=0.05, take_profit_pct=0.10):
-    """
-    Simuliert eine einfache Portfolio-Strategie basierend auf Vorhersage-Signalen
-    mit Risikomanagement (Stop-Loss und Take-Profit).
+def kapital_backtest(df, predictions, threshold=0.5,
+                     initial_cash=10_000, stop_loss_pct=0.05,
+                     take_profit_pct=0.10):
+    """Simuliert eine Portfolio-Strategie auf Basis von Modellvorhersagen."""
+    assert 'Close' in df.columns, "'Close'-Spalte fehlt im DataFrame"
+    assert len(predictions) + 1 <= len(df), (
+        "DataFrame ist zu kurz oder predictions zu lang!")
 
-    Args:
-        df: DataFrame mit mindestens einer 'Close'-Spalte für die Preisdaten
-        predictions: NumPy-Array mit Vorhersagewerten (Wahrscheinlichkeiten)
-        threshold: Schwellenwert für Kaufsignale
-        initial_cash: Anfangskapital
-        stop_loss_pct: Prozentsatz für Stop-Loss (z.B. 0.05 = 5%)
-        take_profit_pct: Prozentsatz für Take-Profit (z.B. 0.10 = 10%)
-
-    Returns:
-        dict: Performance-Metriken des simulierten Portfolios
-    """
-    cash = initial_cash
-    position = 0
+    cash = float(initial_cash)
+    position = 0.0
     equity_curve = []
     trades = []
 
-    # Trading-Statistiken
     total_trades = 0
     winning_trades = 0
     losing_trades = 0
 
-    assert 'Close' in df.columns, "'Close'-Spalte fehlt im DataFrame"
-    assert len(predictions) + \
-        1 <= len(df), "DataFrame ist zu kurz oder predictions zu lang!"
-
-    # Konvertiere predictions in ein einfaches NumPy-Array falls nötig
     if hasattr(predictions, 'values'):
         predictions = predictions.values
 
-    predictions = np.asarray(predictions).flatten()
+    predictions = _flatten_to_float_list(predictions)
 
-    # Für Stop-Loss und Take-Profit
-    entry_price = 0
-    stop_price = 0
-    target_price = 0
+    entry_price = 0.0
+    stop_price = 0.0
+    target_price = 0.0
+
+    def _determine_position_size(confidence: float) -> float:
+        if confidence > 0.7:
+            return 1.0
+        if confidence > 0.6:
+            return 0.8
+        if confidence > 0.5:
+            return 0.6
+        if confidence > 0.4:
+            return 0.4
+        return 0.3
 
     for i in range(1, len(predictions) + 1):
-        # Explizit als Fließkommazahl mit sicherer Index-Prüfung extrahieren
-        if i < len(df):
-            # Verwende .iloc[i].squeeze() für Serie und dann float() für sicheren Wert
-            price_today = float(df['Close'].iloc[i].squeeze()) if hasattr(
-                df['Close'].iloc[i], 'squeeze') else float(df['Close'].iloc[i])
-        else:
-            # Fallback zum letzten verfügbaren Preis
-            price_today = float(df['Close'].iloc[-1].squeeze()) if hasattr(
-                df['Close'].iloc[-1], 'squeeze') else float(df['Close'].iloc[-1])
+        price_index = min(i, len(df) - 1)
+        price_today = float(df['Close'].iloc[price_index])
 
-        # Explizit einen booleschen Wert erzeugen
         pred_value = float(predictions[i - 1])
         signal_bool = pred_value > threshold
 
-        # Überprüfe Stop-Loss oder Take-Profit, wenn Position aktiv
         if position > 0:
-            # Stop-Loss prüfen
             if price_today <= stop_price:
-                cash = position * price_today
-                # Trade-Statistiken erfassen
+                cash += position * price_today
                 trade_result = (price_today / entry_price - 1) * 100
                 trades.append({
                     "Art": "Verkauf (Stop-Loss)",
@@ -72,18 +66,12 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
                     "Ausstiegspreis": price_today,
                     "Rendite_pct": trade_result
                 })
-
                 losing_trades += 1
                 total_trades += 1
-
-                # Position schließen
-                position = 0
-                entry_price = 0
-
-            # Take-Profit prüfen
+                position = 0.0
+                entry_price = 0.0
             elif price_today >= target_price:
-                cash = position * price_today
-                # Trade-Statistiken erfassen
+                cash += position * price_today
                 trade_result = (price_today / entry_price - 1) * 100
                 trades.append({
                     "Art": "Verkauf (Take-Profit)",
@@ -91,44 +79,33 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
                     "Ausstiegspreis": price_today,
                     "Rendite_pct": trade_result
                 })
-
                 winning_trades += 1
                 total_trades += 1
+                position = 0.0
+                entry_price = 0.0
 
-                # Position schließen
-                position = 0
-                entry_price = 0
+        if signal_bool and position == 0 and cash > 0:
+            position_fraction = _determine_position_size(pred_value)
+            invest_amount = cash * position_fraction
 
-        # Normale Handelssignale verarbeiten
-        if signal_bool and position == 0:
+            if invest_amount > 0:
+                position = invest_amount / price_today
+                cash -= invest_amount
+                entry_price = price_today
 
-            # Kaufen
-            position = cash / price_today
-            cash = 0
-
-            # Setze Entry, Stop-Loss und Take-Profit
-            entry_price = price_today
-
-            # Dynamische SL/TP basierend auf ATR wenn verfügbar
-            if 'atr' in df.columns:
-                atr_value = df['atr'].iloc[i]
-                # ATR-basierter Stop-Loss (2x ATR)
-                dynamic_sl = atr_value * 2
-                stop_price = entry_price - dynamic_sl
-
-                # ATR-basierter Take-Profit (4x ATR für 2:1 RR)
-                dynamic_tp = atr_value * 4
-                target_price = entry_price + dynamic_tp
-            else:
-                # Fallback auf prozentuale Werte
-                stop_price = entry_price * (1 - stop_loss_pct)
-                target_price = entry_price * (1 + take_profit_pct)
+                if 'atr' in df.columns:
+                    atr_index = min(i, len(df) - 1)
+                    atr_value = float(df['atr'].iloc[atr_index])
+                    dynamic_sl = atr_value * 2
+                    stop_price = entry_price - dynamic_sl
+                    dynamic_tp = atr_value * 4
+                    target_price = entry_price + dynamic_tp
+                else:
+                    stop_price = entry_price * (1 - stop_loss_pct)
+                    target_price = entry_price * (1 + take_profit_pct)
 
         elif not signal_bool and position > 0 and entry_price > 0:
-            # Verkaufen (normales Signal)
-            cash = position * price_today
-
-            # Trade-Statistiken erfassen
+            cash += position * price_today
             trade_result = (price_today / entry_price - 1) * 100
             trades.append({
                 "Art": "Verkauf (Signal)",
@@ -143,19 +120,16 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
                 losing_trades += 1
 
             total_trades += 1
-
-            # Position schließen
-            position = 0
-            entry_price = 0
+            position = 0.0
+            entry_price = 0.0
 
         portfolio_value = cash + position * price_today
         equity_curve.append(portfolio_value)
 
-    # Letzte Position ggf. auflösen (End of Backtest)
-    if position > 0 and i == len(predictions):
-        cash = position * price_today
+    if position > 0:
+        price_today = float(df['Close'].iloc[-1])
+        cash += position * price_today
 
-        # Trade-Statistiken für letzten Trade
         if entry_price > 0:
             trade_result = (price_today / entry_price - 1) * 100
             trades.append({
@@ -172,52 +146,51 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
 
             total_trades += 1
 
-        position = 0
+        position = 0.0
+        entry_price = 0.0
 
-    # Berechne Drawdown
-    peak = np.maximum.accumulate(equity_curve)
-    drawdown = (peak - equity_curve) / peak * 100  # in Prozent
-    max_drawdown = np.max(drawdown)
+    peak = []
+    current_max = float('-inf')
+    for value in equity_curve:
+        current_max = max(current_max, value)
+        peak.append(current_max)
 
-    # Erstellung der Ergebnisse
-    final_value = equity_curve[-1]
-    gesamtrendite = (final_value - initial_cash) / initial_cash * 100
-
-    # Berechne Sharpe Ratio (vereinfacht, ohne risikofreien Zinssatz)
-    if len(equity_curve) > 1:
-        daily_returns = np.diff(equity_curve) / equity_curve[:-1]
-        sharpe_ratio = np.mean(daily_returns) / np.std(daily_returns) * \
-            np.sqrt(252) if np.std(daily_returns) > 0 else 0
+    if peak and equity_curve:
+        drawdown = [
+            ((p - eq) / p * 100) if p else 0.0
+            for p, eq in zip(peak, equity_curve)
+        ]
+        max_drawdown = max(drawdown) if drawdown else 0.0
     else:
-        sharpe_ratio = 0
+        drawdown = []
+        max_drawdown = 0.0
 
-    # Win-Rate berechnen
-    win_rate = winning_trades / total_trades if total_trades > 0 else 0
+    if len(equity_curve) > 1:
+        daily_returns = []
+        for prev, curr in zip(equity_curve[:-1], equity_curve[1:]):
+            if prev != 0:
+                daily_returns.append((curr - prev) / prev)
 
-    # Adaptive Position Sizing basierend auf Konfidenz
-    position_size = 1.0  # Standard: 100% des verfügbaren Kapitals
+        if daily_returns:
+            mean_return = sum(daily_returns) / len(daily_returns)
+            variance = sum((r - mean_return) ** 2 for r in daily_returns) / len(daily_returns)
+            std_return = variance ** 0.5
+            sharpe_ratio = (mean_return / std_return * sqrt(252)) if std_return > 0 else 0.0
+        else:
+            sharpe_ratio = 0.0
+    else:
+        sharpe_ratio = 0.0
 
-    # Skaliere Positionsgröße basierend auf Signal-Stärke (pred_value)
-    if pred_value > 0.7:  # Sehr starkes Signal
-        position_size = 1.0
-    elif pred_value > 0.6:  # Starkes Signal
-        position_size = 0.8
-    elif pred_value > 0.5:  # Moderates Signal
-        position_size = 0.6
-    elif pred_value > 0.4:  # Schwaches Signal
-        position_size = 0.4
-    else:  # Sehr schwaches Signal
-        position_size = 0.3
-
-    # Kaufen mit angepasster Positionsgröße
-    position = (cash * position_size) / price_today
+    win_rate = (winning_trades / total_trades) if total_trades > 0 else 0
+    final_value = equity_curve[-1] if equity_curve else initial_cash
+    gesamtrendite = (final_value - initial_cash) / initial_cash * 100
 
     return {
         "Startkapital": initial_cash,
         "Endkapital": round(final_value, 2),
         "Rendite (%)": round(gesamtrendite, 2),
-        "Max Equity": round(max(equity_curve), 2),
-        "Min Equity": round(min(equity_curve), 2),
+        "Max Equity": round(max(equity_curve), 2) if equity_curve else initial_cash,
+        "Min Equity": round(min(equity_curve), 2) if equity_curve else initial_cash,
         "Max Drawdown (%)": round(max_drawdown, 2),
         "Sharpe Ratio": round(sharpe_ratio, 2),
         "Anzahl Trades": total_trades,
@@ -225,5 +198,5 @@ def kapital_backtest(df: pd.DataFrame, predictions: np.ndarray, threshold=0.5,
         "Verlorene Trades": losing_trades,
         "Win-Rate": round(win_rate * 100, 2),
         "Trade-Details": trades,
-        "Equity-Verlauf": equity_curve
+        "Equity-Verlauf": equity_curve,
     }

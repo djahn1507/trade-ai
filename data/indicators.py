@@ -1,10 +1,5 @@
 import pandas as pd
 import ta  # pip install ta
-from config import ticker
-from sklearn.preprocessing import StandardScaler
-
-import pandas as pd
-import ta  # pip install ta
 from sklearn.preprocessing import StandardScaler
 
 
@@ -79,9 +74,17 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     # Remove NaN values
     df = df.dropna()
 
-    # Scaling
-    scaler = StandardScaler()
-    scaled = scaler.fit_transform(df)
-    df_scaled = pd.DataFrame(scaled, columns=df.columns, index=df.index)
+    # Columns that must remain in ihrem ursprünglichen Wertebereich für Backtests
+    preserve_columns = [
+        col for col in ['Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume', 'atr']
+        if col in df.columns
+    ]
 
-    return df_scaled
+    # Scale only the remaining feature columns
+    feature_columns = [col for col in df.columns if col not in preserve_columns]
+
+    if feature_columns:
+        scaler = StandardScaler()
+        df.loc[:, feature_columns] = scaler.fit_transform(df[feature_columns])
+
+    return df
