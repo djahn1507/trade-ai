@@ -64,6 +64,7 @@ def train_model():
               epochs=20,  # Mehr Epochen mit Early Stopping
               batch_size=32,
               validation_split=0.2,  # Größerer Validierungssatz
+              shuffle=False,  # Zeitreihen: Reihenfolge beibehalten
               callbacks=callbacks)
 
     # 5. Modell speichern
