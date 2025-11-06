@@ -25,10 +25,12 @@ def build_lstm_model(
 
     # Attention-Mechanismus mit Keras-kompatiblen Operationen
     attention_scores = Dense(1, activation='tanh')(lstm2)
-    attention = Softmax(axis=1, name="attention_softmax")(attention_scores)
+    squeezed_scores = Lambda(lambda x: K.squeeze(x, axis=-1), name="attention_squeeze")(attention_scores)
+    attention_weights = Softmax(name="attention_softmax")(squeezed_scores)
+    expanded_weights = Lambda(lambda x: K.expand_dims(x, axis=-1), name="attention_expand")(attention_weights)
 
     # Wenden Sie die Attention auf die LSTM-Ausgabe an
-    weighted = Multiply()([lstm2, attention])
+    weighted = Multiply(name="attention_weighting")([lstm2, expanded_weights])
     
     # Verwenden Sie Lambda für die Summe
     merge_model = Lambda(lambda x: K.sum(x, axis=1))(weighted)
