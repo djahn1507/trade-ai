@@ -1,7 +1,6 @@
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-from tensorflow.keras.layers import Attention, Concatenate, Reshape, Permute, Dense, multiply, Lambda, Flatten
+from tensorflow.keras.layers import Flatten, Lambda, multiply
 from tensorflow.keras import backend as K
 
 def build_lstm_model(
@@ -28,10 +27,9 @@ def build_lstm_model(
     attention = Dense(1, activation='tanh')(lstm2)
     attention = Flatten()(attention)
     attention = Lambda(lambda x: K.softmax(x))(attention)
-    attention = Reshape((1, attention.shape[1]))(attention)
-    
-    # Wenden Sie die Attention auf die LSTM-Ausgabe an (mit Permute)
-    attention = Permute((2, 1))(attention)
+    attention = Lambda(lambda x: K.expand_dims(x, axis=-1))(attention)
+
+    # Wenden Sie die Attention auf die LSTM-Ausgabe an
     weighted = multiply([lstm2, attention])
     
     # Verwenden Sie Lambda für die Summe
