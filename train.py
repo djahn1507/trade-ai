@@ -23,12 +23,18 @@
 
 #     return model, history
 
-from config import *
+from config import (
+    ticker,
+    sequence_length,
+    train_start,
+    train_end,
+    test_start,
+    test_end,
+)
 from data.fetcher import fetch_stock_data
 from data.indicators import add_technical_indicators
 from features.windowing import create_lstm_dataset_classification
 from models.lstm import build_lstm_model
-from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import os
 
