@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-from tensorflow.keras.layers import Flatten, Lambda, Multiply
+from tensorflow.keras.layers import Lambda, Multiply, Softmax
 from tensorflow.keras import backend as K
 
 def build_lstm_model(
@@ -24,10 +24,8 @@ def build_lstm_model(
     lstm2 = Dropout(dropout_rate/2)(lstm2)
 
     # Attention-Mechanismus mit Keras-kompatiblen Operationen
-    attention = Dense(1, activation='tanh')(lstm2)
-    attention = Flatten()(attention)
-    attention = Lambda(lambda x: K.softmax(x))(attention)
-    attention = Lambda(lambda x: K.expand_dims(x, axis=-1))(attention)
+    attention_scores = Dense(1, activation='tanh')(lstm2)
+    attention = Softmax(axis=1, name="attention_softmax")(attention_scores)
 
     # Wenden Sie die Attention auf die LSTM-Ausgabe an
     weighted = Multiply()([lstm2, attention])
