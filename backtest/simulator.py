@@ -10,6 +10,25 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
     """Führt einen vollständigen Backtest inklusive Portfolio-Simulation durch."""
     y_pred_raw = model.predict(X_test)
 
+    def _coerce_to_float(value):
+        """Convert pandas/numpy scalars without triggering FutureWarnings."""
+
+        if hasattr(value, "item"):
+            try:
+                return float(value.item())
+            except (TypeError, ValueError):
+                pass
+
+        if hasattr(value, "iloc"):
+            try:
+                first_value = value.iloc[0]
+            except (IndexError, TypeError, AttributeError):
+                first_value = value
+            else:
+                return _coerce_to_float(first_value)
+
+        return float(value)
+
     def _flatten(values):
         if isinstance(values, (list, tuple)):
             flattened = []
@@ -18,7 +37,7 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
             return flattened
         if hasattr(values, "tolist"):
             return _flatten(values.tolist())
-        return [float(values)]
+        return [_coerce_to_float(values)]
 
     y_pred = [float(v) for v in _flatten(y_pred_raw)]
 
