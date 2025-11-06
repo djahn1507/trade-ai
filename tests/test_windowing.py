@@ -1,5 +1,6 @@
-import numpy as np
 import pytest
+
+np = pytest.importorskip("numpy")
 
 from features.windowing import add_features_from_sequence
 

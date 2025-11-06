@@ -1,5 +1,26 @@
-import numpy as np
-import pandas as pd
+from __future__ import annotations
+
+from functools import lru_cache
+from importlib import import_module
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - nur für Typprüfungen relevant
+    import numpy as np  # noqa: WPS433 - nur für Typing
+    import pandas as pd  # noqa: WPS433 - nur für Typing
+
+
+@lru_cache(maxsize=1)
+def _get_numpy_module():
+    """Gibt das zur Laufzeit importierte ``numpy``-Modul zurück."""
+
+    return import_module("numpy")
+
+
+@lru_cache(maxsize=1)
+def _get_pandas_module():
+    """Gibt das zur Laufzeit importierte ``pandas``-Modul zurück."""
+
+    return import_module("pandas")
 
 # def create_lstm_dataset_classification(df: pd.DataFrame, sequence_length: int = 30) -> tuple:
 #     """
@@ -25,6 +46,8 @@ def create_labels(df: pd.DataFrame, lookahead: int = 3, threshold: float = 0.015
     """
     Ziel ist 1, wenn der Preis in den nächsten `lookahead` Tagen um mindestens `threshold` steigt.
     """
+    pd = _get_pandas_module()
+
     future_return = (df['Close'].shift(-lookahead) - df['Close']) / df['Close']
     return (future_return > threshold).astype(int)
 
@@ -37,6 +60,8 @@ def add_features_from_sequence(X, y=None):
     Die Implementierung ist vollständig vektorisiert, sodass jede Feature-Spalte
     nur einmal verarbeitet wird und unnötige Kopien vermieden werden.
     """
+
+    np = _get_numpy_module()
 
     X = np.asarray(X)
     if X.ndim != 3:
@@ -69,6 +94,9 @@ def add_features_from_sequence(X, y=None):
 
 
 def create_lstm_dataset_classification(df, sequence_length, lookahead=5, threshold=0.02):
+    pd = _get_pandas_module()
+    np = _get_numpy_module()
+
     df = df.copy()
     df['target'] = create_labels(df, lookahead, threshold)
 
