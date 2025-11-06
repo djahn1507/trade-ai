@@ -85,31 +85,64 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
             "Gewinn/Verlust-Verhältnis": 0,
         }
 
-    benchmark = {"Buy & Hold Rendite (%)": 0, "Überperformance (%)": 0}
+    def _berechne_benchmark() -> dict:
+        fallback = {"Buy & Hold Rendite (%)": 0, "Überperformance (%)": 0}
 
-    equity_curve = portfolio.get("Equity-Verlauf", [])
-    if len(df_test) > 1 and equity_curve:
+        if not isinstance(df_test, pd.DataFrame):
+            return fallback
+
+        if "Close" not in df_test.columns:
+            return fallback
+
+        equity_curve_local = portfolio.get("Equity-Verlauf", [])
+        if len(df_test) < 2 or not equity_curve_local:
+            return fallback
+
         try:
-            valid_start_index = min(1, len(df_test) - 1)
-            start_price = float(df_test['Close'].iloc[valid_start_index])
-            end_price = float(df_test['Close'].iloc[-1])
-            initial_cash = portfolio["Startkapital"]
-            shares = initial_cash / start_price if start_price != 0 else 0
+            close_series = df_test["Close"].astype(float)
+        except (TypeError, ValueError, AttributeError):
+            # ``astype`` existiert ggf. nicht bei stubs in den Tests
+            try:
+                close_series = df_test["Close"].apply(float)
+            except AttributeError:
+                return fallback
 
-            buy_hold = [initial_cash] * len(equity_curve)
-            for i in range(1, len(equity_curve)):
-                idx = min(i + 1, len(df_test) - 1)
-                current_price = float(df_test['Close'].iloc[idx])
-                buy_hold[i] = shares * current_price
+        try:
+            valid_start_index = min(1, len(close_series) - 1)
+            start_price = float(close_series.iloc[valid_start_index])
+        except (IndexError, TypeError, ValueError, AttributeError):
+            return fallback
 
-            buy_hold_return = ((buy_hold[-1] - buy_hold[0]) / buy_hold[0] * 100)
-            benchmark = {
-                "Buy & Hold Rendite (%)": round(buy_hold_return, 2),
-                "Überperformance (%)": round(
-                    portfolio["Rendite (%)"] - buy_hold_return, 2),
-            }
-        except (IndexError, ValueError, ZeroDivisionError) as exc:
-            print(f"Warning: Could not calculate buy & hold benchmark: {exc}")
+        if start_price == 0:
+            return fallback
+
+        initial_cash = portfolio.get("Startkapital", 0)
+        if not initial_cash:
+            return fallback
+
+        shares = initial_cash / start_price
+        buy_hold = [initial_cash] * len(equity_curve_local)
+
+        for i in range(1, len(equity_curve_local)):
+            idx = min(i + 1, len(close_series) - 1)
+            try:
+                current_price = float(close_series.iloc[idx])
+            except (IndexError, TypeError, ValueError, AttributeError):
+                return fallback
+            buy_hold[i] = shares * current_price
+
+        if not buy_hold or buy_hold[0] == 0:
+            return fallback
+
+        buy_hold_return = (buy_hold[-1] - buy_hold[0]) / buy_hold[0] * 100
+        ueberperformance = portfolio.get("Rendite (%)", 0) - buy_hold_return
+
+        return {
+            "Buy & Hold Rendite (%)": round(buy_hold_return, 2),
+            "Überperformance (%)": round(ueberperformance, 2),
+        }
+
+    benchmark = _berechne_benchmark()
 
     ergebnisse = {
         "Metriken": klassifikation,
