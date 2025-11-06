@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input
-from tensorflow.keras.layers import Flatten, Lambda, multiply
+from tensorflow.keras.layers import Flatten, Lambda, Multiply
 from tensorflow.keras import backend as K
 
 def build_lstm_model(
@@ -30,7 +30,7 @@ def build_lstm_model(
     attention = Lambda(lambda x: K.expand_dims(x, axis=-1))(attention)
 
     # Wenden Sie die Attention auf die LSTM-Ausgabe an
-    weighted = multiply([lstm2, attention])
+    weighted = Multiply()([lstm2, attention])
     
     # Verwenden Sie Lambda für die Summe
     merge_model = Lambda(lambda x: K.sum(x, axis=1))(weighted)
