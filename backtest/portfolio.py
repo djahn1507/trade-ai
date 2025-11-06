@@ -1,5 +1,25 @@
 from math import sqrt
 
+def _coerce_to_float(value):
+    """Convert pandas/numpy scalars without triggering FutureWarnings."""
+
+    if hasattr(value, "item"):
+        try:
+            return float(value.item())
+        except (TypeError, ValueError):
+            pass
+
+    if hasattr(value, "iloc"):
+        try:
+            first_value = value.iloc[0]
+        except (IndexError, TypeError, AttributeError):
+            first_value = value
+        else:
+            return _coerce_to_float(first_value)
+
+    return float(value)
+
+
 def _flatten_to_float_list(values):
     """Converts nested iterables into a flat list of floats."""
     if isinstance(values, (list, tuple)):
@@ -9,7 +29,7 @@ def _flatten_to_float_list(values):
         return flattened
     if hasattr(values, "tolist"):
         return _flatten_to_float_list(values.tolist())
-    return [float(values)]
+    return [_coerce_to_float(values)]
 
 
 def kapital_backtest(df, predictions, threshold=0.5,
