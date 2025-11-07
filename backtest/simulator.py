@@ -5,8 +5,19 @@ from backtest.metrics import evaluate_classification
 from backtest.portfolio import kapital_backtest
 
 
-def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
-                      stop_loss_pct=0.05, take_profit_pct=0.10) -> dict:
+def simulate_backtest(
+    model,
+    X_test,
+    y_test,
+    df_test,
+    threshold=0.6,
+    stop_loss_pct=0.05,
+    take_profit_pct=0.10,
+    probability_buffer: float = 0.0,
+    slippage_pct: float = 0.0005,
+    trading_fee_pct: float = 0.0005,
+    cooldown_bars: int = 1,
+) -> dict:
     """Führt einen vollständigen Backtest inklusive Portfolio-Simulation durch."""
     y_pred_raw = model.predict(X_test)
 
@@ -60,9 +71,15 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
     }
 
     portfolio = kapital_backtest(
-        df_test, y_pred, threshold,
+        df_test,
+        y_pred,
+        threshold,
         stop_loss_pct=stop_loss_pct,
         take_profit_pct=take_profit_pct,
+        probability_buffer=probability_buffer,
+        slippage_pct=slippage_pct,
+        trading_fee_pct=trading_fee_pct,
+        cooldown_bars=cooldown_bars,
     )
 
     trade_details = portfolio.get("Trade-Details", [])
@@ -144,6 +161,15 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
 
     benchmark = _berechne_benchmark()
 
+    total_signals = len(y_pred)
+    triggered_signals = sum(1 for prob in y_pred if prob >= threshold)
+    confident_signals = sum(1 for prob in y_pred if prob >= threshold + probability_buffer)
+    avg_distance = (
+        sum(max(0.0, prob - threshold) for prob in y_pred) / triggered_signals
+        if triggered_signals
+        else 0.0
+    )
+
     ergebnisse = {
         "Metriken": klassifikation,
         "Portfolio": {
@@ -153,6 +179,13 @@ def simulate_backtest(model, X_test, y_test, df_test, threshold=0.6,
         "Trade-Analyse": trade_analysis,
         "Benchmark": benchmark,
         "Vorhersage-Verteilung": pred_dist,
+        "Signal-Analyse": {
+            "Gesamt-Signale": total_signals,
+            "Signale über Threshold": triggered_signals,
+            "Signale über Threshold + Buffer": confident_signals,
+            "Durchschn. Abstand zum Threshold": round(avg_distance, 4),
+            "Verwendeter Buffer": probability_buffer,
+        },
         "Chart": None,
     }
 

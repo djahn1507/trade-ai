@@ -42,58 +42,102 @@ def _get_pandas_module():
 #     return np.array(X), np.array(y)
 
 
-def create_labels(df: pd.DataFrame, lookahead: int = 3, threshold: float = 0.015) -> pd.Series:
-    """
-    Ziel ist 1, wenn der Preis in den nächsten `lookahead` Tagen um mindestens `threshold` steigt.
-    """
+def create_labels(
+    df: pd.DataFrame,
+    lookahead: int = 5,
+    threshold: float = 0.01,
+) -> pd.Series:
+    """Erzeugt ein binäres Label auf Basis der maximalen Rendite im Lookahead-Fenster."""
+
     pd = _get_pandas_module()
 
-    future_return = (df['Close'].shift(-lookahead) - df['Close']) / df['Close']
+    close = df["Close"].astype(float)
+    shifted_closes = [close.shift(-offset) for offset in range(1, max(lookahead, 1) + 1)]
+    future_max = pd.concat(shifted_closes, axis=1).max(axis=1)
+    future_return = (future_max - close) / close
+
     return (future_return > threshold).astype(int)
 
 
 def add_features_from_sequence(X, y=None):
-    """Berechnet zusätzliche Sequenz-Features wie den Trend jeder Feature-Spalte.
-
-    Für jede Zeitreihen-Spalte wird eine lineare Regression über den Sequenzindex
-    durchgeführt und die resultierende Steigung als neues Feature angehängt.
-    Die Implementierung ist vollständig vektorisiert, sodass jede Feature-Spalte
-    nur einmal verarbeitet wird und unnötige Kopien vermieden werden.
-    """
+    """Berechnet zusätzliche Sequenz-Features wie Trend, Mittelwert und Volatilität."""
 
     np = _get_numpy_module()
 
-    X = np.asarray(X)
-    if X.ndim != 3:
+    X_arr = np.asarray(X)
+    if X_arr.ndim != 3:
         raise ValueError("X must be a 3D array with shape (samples, sequence_length, features)")
 
-    n_samples, seq_len, n_features = X.shape
+    data = X_arr.tolist()
+    n_samples, seq_len, n_features = X_arr.shape
 
-    if seq_len <= 1:
-        # Für Sequenzen der Länge 0 oder 1 ist die Steigung definitionsgemäß 0.
-        slope_features = np.zeros((n_samples, seq_len, n_features), dtype=X.dtype)
-        return np.concatenate((X, slope_features), axis=2)
+    slopes = [[0.0 for _ in range(n_features)] for _ in range(n_samples)]
+    means = [[0.0 for _ in range(n_features)] for _ in range(n_samples)]
+    stds = [[0.0 for _ in range(n_features)] for _ in range(n_samples)]
+    momentum = [[0.0 for _ in range(n_features)] for _ in range(n_samples)]
+    last_vs_mean = [[0.0 for _ in range(n_features)] for _ in range(n_samples)]
 
-    # Zeitindex vorbereiten (0, 1, ..., seq_len-1) und zentrieren.
-    x = np.arange(seq_len, dtype=X.dtype)
-    x_centered = x - x.mean()
-    denom = np.sum(x_centered ** 2)
+    if seq_len > 1:
+        x_positions = list(range(seq_len))
+        x_mean = sum(x_positions) / seq_len
+        denom = sum((pos - x_mean) ** 2 for pos in x_positions)
+    else:
+        x_positions = [0]
+        x_mean = 0.0
+        denom = 0.0
 
-    # Mittelwerte der einzelnen Feature-Spalten je Sequenz.
-    y_mean = X.mean(axis=1, keepdims=True)
-    y_centered = X - y_mean
+    for sample_idx, sample in enumerate(data):
+        for feature_idx in range(n_features):
+            series = [step[feature_idx] for step in sample]
+            mean_value = sum(series) / len(series) if series else 0.0
+            means[sample_idx][feature_idx] = mean_value
 
-    # Numerator der Steigungsformel: Summe((x - x_mean) * (y - y_mean)).
-    numerator = np.sum(x_centered.reshape(1, seq_len, 1) * y_centered, axis=1)
-    slopes = numerator / denom
+            if len(series) > 1 and denom:
+                numerator = sum((pos - x_mean) * (value - mean_value) for pos, value in zip(x_positions, series))
+                slopes[sample_idx][feature_idx] = numerator / denom
+                variance = sum((value - mean_value) ** 2 for value in series) / len(series)
+                stds[sample_idx][feature_idx] = variance ** 0.5
+                momentum[sample_idx][feature_idx] = series[-1] - series[0]
+                last_vs_mean[sample_idx][feature_idx] = series[-1] - mean_value
+            else:
+                slopes[sample_idx][feature_idx] = 0.0
+                stds[sample_idx][feature_idx] = 0.0
+                momentum[sample_idx][feature_idx] = 0.0
+                last_vs_mean[sample_idx][feature_idx] = series[-1] - mean_value if series else 0.0
 
-    # Die Steigungen als konstante Feature-Spalten an jede Sequenz anhängen.
-    slope_features = np.broadcast_to(slopes[:, None, :], (n_samples, seq_len, n_features))
+    def _expand(feature_matrix):
+        expanded = []
+        for sample_idx in range(n_samples):
+            repeated = []
+            for _ in range(seq_len):
+                repeated.append(feature_matrix[sample_idx])
+            expanded.append(repeated)
+        return expanded
 
-    return np.concatenate((X, slope_features), axis=2)
+    slope_features = _expand(slopes)
+    mean_features = _expand(means)
+    std_features = _expand(stds)
+    momentum_features = _expand(momentum)
+    last_vs_mean_features = _expand(last_vs_mean)
+
+    enhanced = []
+    for sample_idx in range(n_samples):
+        sample_rows = []
+        for step_idx in range(seq_len):
+            row = []
+            row.extend(data[sample_idx][step_idx])
+            row.extend(slope_features[sample_idx][step_idx])
+            row.extend(mean_features[sample_idx][step_idx])
+            row.extend(std_features[sample_idx][step_idx])
+            row.extend(momentum_features[sample_idx][step_idx])
+            row.extend(last_vs_mean_features[sample_idx][step_idx])
+            sample_rows.append(row)
+        enhanced.append(sample_rows)
+
+    return np.asarray(enhanced)
 
 
-def create_lstm_dataset_classification(df, sequence_length, lookahead=5, threshold=0.02):
+def create_lstm_dataset_classification(df, sequence_length, lookahead=5, threshold=0.01):
     pd = _get_pandas_module()
     np = _get_numpy_module()
 

@@ -30,7 +30,7 @@ def test_simulate_backtest_computes_benchmark_with_real_prices():
     assert benchmark["Buy & Hold Rendite (%)"] == 10.0
 
     portfolio = results["Portfolio"]
-    assert math.isclose(portfolio["Rendite (%)"], (105.0 / 102.0 - 1) * 100, abs_tol=1e-2)
+    assert math.isclose(portfolio["Rendite (%)"], 2.74, abs_tol=1e-2)
     assert math.isclose(benchmark["Überperformance (%)"],
                         portfolio["Rendite (%)"] - 10.0,
                         abs_tol=1e-2)
@@ -38,4 +38,10 @@ def test_simulate_backtest_computes_benchmark_with_real_prices():
     dist = results["Vorhersage-Verteilung"]
     assert dist["Max"] == 0.8
     assert dist["Min"] == 0.2
+
+    signals = results["Signal-Analyse"]
+    assert signals["Gesamt-Signale"] == 5
+    assert signals["Signale über Threshold"] == 1
+    assert signals["Signale über Threshold + Buffer"] == 1
+    assert math.isclose(signals["Durchschn. Abstand zum Threshold"], 0.3, rel_tol=1e-5)
 

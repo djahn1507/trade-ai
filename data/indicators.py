@@ -12,7 +12,36 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+
+try:  # pragma: no cover - optional dependency
+    from sklearn.preprocessing import StandardScaler  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - expected in the sandbox
+    class StandardScaler:  # type: ignore
+        def fit(self, data):
+            self._means = []
+            self._stds = []
+            n_features = len(data[0]) if data else 0
+            for col in range(n_features):
+                column = [row[col] for row in data]
+                mean = sum(column) / len(column) if column else 0.0
+                variance = sum((value - mean) ** 2 for value in column) / len(column) if column else 0.0
+                std = variance ** 0.5 if variance > 0 else 1.0
+                self._means.append(mean)
+                self._stds.append(std)
+            return self
+
+        def fit_transform(self, data):
+            self.fit(data)
+            return self.transform(data)
+
+        def transform(self, data):
+            transformed = []
+            for row in data:
+                transformed.append([
+                    (value - mean) / std if std else 0.0
+                    for value, mean, std in zip(row, self._means, self._stds)
+                ])
+            return transformed
 
 try:  # pragma: no cover - optionale Abhängigkeit
     import ta  # type: ignore
@@ -130,6 +159,10 @@ def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     if feature_columns:
         scaler = StandardScaler()
-        df.loc[:, feature_columns] = scaler.fit_transform(df[feature_columns])
+        matrix = [[df[col].iloc[i] for col in feature_columns] for i in range(len(df))]
+        scaled = scaler.fit_transform(matrix)
+        for col_index, column_name in enumerate(feature_columns):
+            column_values = [row[col_index] for row in scaled]
+            df[column_name] = column_values
 
     return df

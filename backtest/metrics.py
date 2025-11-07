@@ -1,4 +1,30 @@
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+try:  # pragma: no cover - optional dependency
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - expected in sandbox
+    def accuracy_score(y_true, y_pred):
+        matches = sum(1 for a, b in zip(y_true, y_pred) if a == b)
+        return matches / len(y_true) if y_true else 0.0
+
+    def precision_score(y_true, y_pred, zero_division=0):
+        true_positive = sum(1 for yt, yp in zip(y_true, y_pred) if yp == 1 and yt == 1)
+        predicted_positive = sum(1 for yp in y_pred if yp == 1)
+        if predicted_positive == 0:
+            return 0.0 if zero_division == 0 else zero_division
+        return true_positive / predicted_positive
+
+    def recall_score(y_true, y_pred, zero_division=0):
+        true_positive = sum(1 for yt, yp in zip(y_true, y_pred) if yp == 1 and yt == 1)
+        actual_positive = sum(1 for yt in y_true if yt == 1)
+        if actual_positive == 0:
+            return 0.0 if zero_division == 0 else zero_division
+        return true_positive / actual_positive
+
+    def f1_score(y_true, y_pred, zero_division=0):
+        precision = precision_score(y_true, y_pred, zero_division=zero_division)
+        recall = recall_score(y_true, y_pred, zero_division=zero_division)
+        if precision + recall == 0:
+            return 0.0
+        return 2 * precision * recall / (precision + recall)
 
 
 def _to_list(values):

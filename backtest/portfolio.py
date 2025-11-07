@@ -32,9 +32,18 @@ def _flatten_to_float_list(values):
     return [_coerce_to_float(values)]
 
 
-def kapital_backtest(df, predictions, threshold=0.5,
-                     initial_cash=10_000, stop_loss_pct=0.05,
-                     take_profit_pct=0.10):
+def kapital_backtest(
+    df,
+    predictions,
+    threshold=0.5,
+    initial_cash=10_000,
+    stop_loss_pct=0.05,
+    take_profit_pct=0.10,
+    probability_buffer: float = 0.0,
+    slippage_pct: float = 0.0005,
+    trading_fee_pct: float = 0.0005,
+    cooldown_bars: int = 1,
+):
     """Simuliert eine Portfolio-Strategie auf Basis von Modellvorhersagen."""
     assert 'Close' in df.columns, "'Close'-Spalte fehlt im DataFrame"
     assert len(predictions) + 1 <= len(df), (
@@ -44,6 +53,7 @@ def kapital_backtest(df, predictions, threshold=0.5,
     position = 0.0
     equity_curve = []
     trades = []
+    total_fees = 0.0
 
     total_trades = 0
     winning_trades = 0
@@ -57,6 +67,7 @@ def kapital_backtest(df, predictions, threshold=0.5,
     entry_price = 0.0
     stop_price = 0.0
     target_price = 0.0
+    cooldown_counter = 0
 
     def _determine_position_size(confidence: float) -> float:
         if confidence > 0.7:
@@ -73,65 +84,101 @@ def kapital_backtest(df, predictions, threshold=0.5,
         price_index = min(i, len(df) - 1)
         price_today = float(df['Close'].iloc[price_index])
 
+        if cooldown_counter > 0:
+            cooldown_counter -= 1
+
         pred_value = float(predictions[i - 1])
-        signal_bool = pred_value > threshold
+        signal_bool = pred_value >= (threshold + probability_buffer)
 
         if position > 0:
+            effective_exit_price = price_today * (1 - slippage_pct)
             if price_today <= stop_price:
-                cash += position * price_today
-                trade_result = (price_today / entry_price - 1) * 100
+                proceeds = position * effective_exit_price
+                fee = proceeds * trading_fee_pct
+                cash += proceeds - fee
+                total_fees += fee
+                trade_result = (effective_exit_price / entry_price - 1) * 100
                 trades.append({
                     "Art": "Verkauf (Stop-Loss)",
                     "Einstiegspreis": entry_price,
-                    "Ausstiegspreis": price_today,
-                    "Rendite_pct": trade_result
+                    "Ausstiegspreis": effective_exit_price,
+                    "Rendite_pct": trade_result,
+                    "Gebühr": fee,
                 })
                 losing_trades += 1
                 total_trades += 1
                 position = 0.0
                 entry_price = 0.0
+                cooldown_counter = max(cooldown_counter, cooldown_bars)
             elif price_today >= target_price:
-                cash += position * price_today
-                trade_result = (price_today / entry_price - 1) * 100
+                proceeds = position * effective_exit_price
+                fee = proceeds * trading_fee_pct
+                cash += proceeds - fee
+                total_fees += fee
+                trade_result = (effective_exit_price / entry_price - 1) * 100
                 trades.append({
                     "Art": "Verkauf (Take-Profit)",
                     "Einstiegspreis": entry_price,
-                    "Ausstiegspreis": price_today,
-                    "Rendite_pct": trade_result
+                    "Ausstiegspreis": effective_exit_price,
+                    "Rendite_pct": trade_result,
+                    "Gebühr": fee,
                 })
                 winning_trades += 1
                 total_trades += 1
                 position = 0.0
                 entry_price = 0.0
+                cooldown_counter = max(cooldown_counter, cooldown_bars)
 
-        if signal_bool and position == 0 and cash > 0:
+        if signal_bool and position == 0 and cash > 0 and cooldown_counter == 0:
             position_fraction = _determine_position_size(pred_value)
             invest_amount = cash * position_fraction
 
             if invest_amount > 0:
-                position = invest_amount / price_today
-                cash -= invest_amount
-                entry_price = price_today
+                effective_entry_price = price_today * (1 + slippage_pct)
+                if effective_entry_price <= 0:
+                    continue
+                shares = invest_amount / effective_entry_price
+                gross_cost = shares * effective_entry_price
+                fee = gross_cost * trading_fee_pct
+                total_cost = gross_cost + fee
+                if total_cost > cash:
+                    shares = cash / (effective_entry_price * (1 + trading_fee_pct))
+                    gross_cost = shares * effective_entry_price
+                    fee = gross_cost * trading_fee_pct
+                    total_cost = gross_cost + fee
+
+                if shares <= 0:
+                    continue
+
+                cash -= total_cost
+                total_fees += fee
+                position = shares
+                entry_price = effective_entry_price
 
                 if 'atr' in df.columns:
                     atr_index = min(i, len(df) - 1)
                     atr_value = float(df['atr'].iloc[atr_index])
                     dynamic_sl = atr_value * 2
-                    stop_price = entry_price - dynamic_sl
+                    stop_price = max(0.0, entry_price - dynamic_sl)
                     dynamic_tp = atr_value * 4
                     target_price = entry_price + dynamic_tp
                 else:
-                    stop_price = entry_price * (1 - stop_loss_pct)
+                    stop_price = max(0.0, entry_price * (1 - stop_loss_pct))
                     target_price = entry_price * (1 + take_profit_pct)
 
         elif not signal_bool and position > 0 and entry_price > 0:
-            cash += position * price_today
-            trade_result = (price_today / entry_price - 1) * 100
+            effective_exit_price = price_today * (1 - slippage_pct)
+            proceeds = position * effective_exit_price
+            fee = proceeds * trading_fee_pct
+            cash += proceeds - fee
+            total_fees += fee
+            trade_result = (effective_exit_price / entry_price - 1) * 100
             trades.append({
                 "Art": "Verkauf (Signal)",
                 "Einstiegspreis": entry_price,
-                "Ausstiegspreis": price_today,
-                "Rendite_pct": trade_result
+                "Ausstiegspreis": effective_exit_price,
+                "Rendite_pct": trade_result,
+                "Gebühr": fee,
             })
 
             if price_today > entry_price:
@@ -142,21 +189,27 @@ def kapital_backtest(df, predictions, threshold=0.5,
             total_trades += 1
             position = 0.0
             entry_price = 0.0
+            cooldown_counter = max(cooldown_counter, cooldown_bars)
 
         portfolio_value = cash + position * price_today
         equity_curve.append(portfolio_value)
 
     if position > 0:
         price_today = float(df['Close'].iloc[-1])
-        cash += position * price_today
+        effective_exit_price = price_today * (1 - slippage_pct)
+        proceeds = position * effective_exit_price
+        fee = proceeds * trading_fee_pct
+        cash += proceeds - fee
+        total_fees += fee
 
         if entry_price > 0:
-            trade_result = (price_today / entry_price - 1) * 100
+            trade_result = (effective_exit_price / entry_price - 1) * 100
             trades.append({
                 "Art": "Verkauf (Backtest-Ende)",
                 "Einstiegspreis": entry_price,
-                "Ausstiegspreis": price_today,
-                "Rendite_pct": trade_result
+                "Ausstiegspreis": effective_exit_price,
+                "Rendite_pct": trade_result,
+                "Gebühr": fee,
             })
 
             if price_today > entry_price:
@@ -217,6 +270,7 @@ def kapital_backtest(df, predictions, threshold=0.5,
         "Gewonnene Trades": winning_trades,
         "Verlorene Trades": losing_trades,
         "Win-Rate": round(win_rate * 100, 2),
+        "Handelsgebühren": round(total_fees, 2),
         "Trade-Details": trades,
         "Equity-Verlauf": equity_curve,
     }
