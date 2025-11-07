@@ -1,4 +1,3 @@
-import math
 import pytest
 
 pd = pytest.importorskip("pandas")
@@ -20,7 +19,10 @@ def test_kapital_backtest_generates_single_profitable_trade():
     assert result["Anzahl Trades"] == 1
     assert result["Gewonnene Trades"] == 1
 
-    expected_final = round(10_000 * (105.0 / 102.0), 2)
-    assert result["Endkapital"] == expected_final
-    assert math.isclose(result["Rendite (%)"], (105.0 / 102.0 - 1) * 100, abs_tol=1e-2)
+    assert result["Endkapital"] == pytest.approx(10273.55, rel=1e-5)
+    assert result["Rendite (%)"] == pytest.approx(2.74, abs=1e-2)
+    assert result["Handelsgebühren"] == pytest.approx(10.14, abs=1e-2)
+
+    detail = result["Trade-Details"][0]
+    assert "Gebühr" in detail
 

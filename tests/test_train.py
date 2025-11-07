@@ -3,6 +3,10 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
+np = pytest.importorskip("numpy")
+
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -36,11 +40,6 @@ class FakeDataFrame:
         raise KeyError("Mask expected")
 
 
-class FakeArray:
-    def __init__(self, shape):
-        self.shape = shape
-
-
 class DummyModel:
     def __init__(self):
         self.fit_kwargs = None
@@ -48,7 +47,7 @@ class DummyModel:
 
     def fit(self, *args, **kwargs):
         self.fit_kwargs = kwargs
-        return types.SimpleNamespace(history={})
+        return types.SimpleNamespace(history={"val_loss": [1.0]})
 
     def save(self, path):
         self.saved_path = path
@@ -92,10 +91,13 @@ def _install_project_stubs(fake_index, dummy_model, monkeypatch):
     sys.modules["features"] = features_pkg
 
     windowing_module = types.ModuleType("features.windowing")
-    windowing_module.create_lstm_dataset_classification = lambda df, seq_length: (
-        FakeArray((64, seq_length, 1)),
-        FakeArray((64, 1)),
-    )
+
+    def dataset_stub(df, seq_length, lookahead=None, threshold=None):
+        X = np.zeros((40, seq_length, 3), dtype=float)
+        y = np.zeros((40,), dtype=int)
+        return X, y
+
+    windowing_module.create_lstm_dataset_classification = dataset_stub
     sys.modules["features.windowing"] = windowing_module
     setattr(features_pkg, "windowing", windowing_module)
 
@@ -111,9 +113,24 @@ def _install_project_stubs(fake_index, dummy_model, monkeypatch):
     sklearn_pkg = types.ModuleType("sklearn")
     sklearn_pkg.__path__ = []
     model_selection_module = types.ModuleType("sklearn.model_selection")
-    model_selection_module.train_test_split = (
-        lambda X, y, test_size=None, shuffle=None: (X, X, y, y)
-    )
+
+    class DummyTimeSeriesSplit:
+        def __init__(self, n_splits):
+            self.n_splits = n_splits
+
+        def split(self, X):
+            n_samples = len(X)
+            fold_size = max(1, n_samples // (self.n_splits + 1))
+            for split_idx in range(self.n_splits):
+                end = min(n_samples, (split_idx + 1) * fold_size)
+                train_indices = list(range(end))
+                val_start = end
+                val_end = min(n_samples, val_start + fold_size)
+                if val_start >= n_samples:
+                    break
+                yield train_indices, list(range(val_start, val_end))
+
+    model_selection_module.TimeSeriesSplit = DummyTimeSeriesSplit
     sys.modules["sklearn"] = sklearn_pkg
     sys.modules["sklearn.model_selection"] = model_selection_module
     setattr(sklearn_pkg, "model_selection", model_selection_module)

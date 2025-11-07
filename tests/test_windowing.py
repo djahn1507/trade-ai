@@ -21,18 +21,36 @@ def test_add_features_from_sequence_matches_polyfit():
 
     enhanced = add_features_from_sequence(X)
 
-    assert enhanced.shape == (3, 5, 8)
+    n_features = X.shape[2]
+    assert enhanced.shape == (3, 5, n_features * 6)
 
-    added = enhanced[:, :, 4:]
     slopes = reference_slopes(X)
+    slope_block = enhanced[:, :, n_features : n_features * 2]
+    np.testing.assert_allclose(slope_block, slopes[:, None, :])
 
-    np.testing.assert_allclose(added, slopes[:, None, :])
+    mean_block = enhanced[:, :, n_features * 2 : n_features * 3]
+    np.testing.assert_allclose(mean_block, X.mean(axis=1)[:, None, :])
+
+    momentum_block = enhanced[:, :, n_features * 4 : n_features * 5]
+    expected_momentum = (X[:, -1, :] - X[:, 0, :])[:, None, :]
+    np.testing.assert_allclose(
+        momentum_block, np.broadcast_to(expected_momentum, momentum_block.shape)
+    )
 
 
 def test_add_features_from_sequence_handles_short_sequences():
     X = np.ones((2, 1, 3))
     enhanced = add_features_from_sequence(X)
-    np.testing.assert_array_equal(enhanced[:, :, 3:], np.zeros((2, 1, 3)))
+
+    n_features = X.shape[2]
+    slopes = enhanced[:, :, n_features : n_features * 2]
+    np.testing.assert_array_equal(slopes, np.zeros_like(slopes))
+
+    std_block = enhanced[:, :, n_features * 3 : n_features * 4]
+    np.testing.assert_array_equal(std_block, np.zeros_like(std_block))
+
+    mean_block = enhanced[:, :, n_features * 2 : n_features * 3]
+    np.testing.assert_array_equal(mean_block, np.ones_like(mean_block))
 
 
 def test_add_features_from_sequence_requires_3d_input():
