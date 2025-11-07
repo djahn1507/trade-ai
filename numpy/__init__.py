@@ -28,7 +28,9 @@ def _restore_repo_paths(removed: List[Tuple[int, str]]) -> None:
 
 def _load_real_numpy() -> ModuleType | None:
     repo_root = os.path.dirname(os.path.dirname(__file__))
-    removed = _remove_repo_paths(repo_root)
+    removed_paths = _remove_repo_paths(repo_root)
+    placeholder = sys.modules.pop(__name__, None)
+    loaded_module: ModuleType | None = None
     try:
         spec = importlib.util.find_spec('numpy')
         if spec is None or spec.origin is None:
@@ -40,9 +42,12 @@ def _load_real_numpy() -> ModuleType | None:
         if loader is None:  # pragma: no cover - defensive, mirrors importlib
             return None
         loader.exec_module(module)
+        loaded_module = module
         return module
     finally:
-        _restore_repo_paths(removed)
+        if loaded_module is None and placeholder is not None:
+            sys.modules[__name__] = placeholder
+        _restore_repo_paths(removed_paths)
 
 
 _real_numpy = _load_real_numpy()
