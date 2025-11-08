@@ -38,6 +38,16 @@ def _load_real_numpy() -> ModuleType | None:
         if os.path.abspath(spec.origin) == os.path.abspath(__file__):
             return None
         module = importlib.util.module_from_spec(spec)
+        # Prevent recursive re-imports while the real NumPy package is being
+        # initialised. Without this, transient imports that occur during the
+        # execution of ``loader.exec_module`` see this compatibility module as
+        # the canonical ``numpy`` entry in ``sys.modules``. They therefore try
+        # to import ``numpy`` again, which triggers the compatibility loader
+        # recursively and eventually raises ``RecursionError``. By placing the
+        # freshly created module instance into ``sys.modules`` ahead of time we
+        # mirror what ``importlib`` does for regular imports and shield nested
+        # imports from re-entering this loader.
+        sys.modules[__name__] = module
         loader = spec.loader
         if loader is None:  # pragma: no cover - defensive, mirrors importlib
             return None
